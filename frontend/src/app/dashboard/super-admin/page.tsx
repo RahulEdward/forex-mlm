@@ -16,7 +16,7 @@ import {
   Menu
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import ReferralTree from '@/components/referral/ReferralTree'
+import ReferralChart from '@/components/referral/ReferralChart'
 import { Sidebar } from '@/components/layout/Sidebar'
 
 export default function SuperAdminDashboard() {
@@ -121,16 +121,13 @@ export default function SuperAdminDashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground flex dark">
       {/* Sidebar */}
-      <Sidebar collapsed={!isSidebarOpen} />
+      <Sidebar collapsed={!isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
 
       {/* Main Content Area */}
-      <main className={`flex-1 overflow-y-auto h-screen bg-muted/20 transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-20'}`}>
+      <main className={`flex-1 flex flex-col h-screen bg-muted/10 transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-20'}`}>
         {/* Header */}
         <header className="h-16 border-b flex items-center justify-between px-8 bg-background sticky top-0 z-50">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="mr-4 shrink-0 border-muted-foreground/20">
-              <Menu className="h-5 w-5" />
-            </Button>
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
             <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
               Super Admin View
@@ -262,9 +259,7 @@ export default function SuperAdminDashboard() {
                   View Full Hierarchy
                 </Button>
               </div>
-              <div className="bg-card border border-border rounded-xl shadow-sm p-6 min-h-[400px]">
-                <ReferralTree endpoint="/api/referral/admin/tree" maxDepth={5} />
-              </div>
+              <ReferralChart endpoint="/api/referral/admin/tree" maxDepth={5} />
             </div>
 
             {/* Users Table - Takes up 1 column (Acting as a "Recent Users" list) */}

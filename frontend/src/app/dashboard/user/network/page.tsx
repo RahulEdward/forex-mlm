@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, ChevronDown, ChevronRight, Search, ZoomIn, ZoomOut, Layout, ListTree, Share2 } from 'lucide-react'
+import { User, ChevronDown, ChevronRight, Search, ZoomIn, ZoomOut, Layout, ListTree, Share2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { toast } from '@/components/ui/use-toast'
 
 interface TreeNode {
     id: number
@@ -19,23 +20,25 @@ interface TreeNode {
     total_team_size?: number
 }
 
-export default function NetworkPage() {
+export default function UserNetworkPage() {
     const [treeData, setTreeData] = useState<TreeNode[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
     const [zoomLevel, setZoomLevel] = useState(1)
     const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart')
+    const [myReferralCode, setMyReferralCode] = useState('')
 
     useEffect(() => {
         fetchTree()
+        fetchReferralLink()
     }, [])
 
     const fetchTree = async () => {
         setLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`http://localhost:8000/api/referral/admin/tree?depth=20`, {
+            const res = await fetch(`http://localhost:8000/api/referral/tree?depth=20`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
@@ -50,17 +53,41 @@ export default function NetworkPage() {
         }
     }
 
+    const fetchReferralLink = async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`http://localhost:8000/api/referral/link`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setMyReferralCode(data.code)
+            }
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
     const buildHierarchy = (nodes: any[]): TreeNode[] => {
         const map: { [key: number]: TreeNode } = {}
         const roots: TreeNode[] = []
 
+        // First pass: Initialize map
         nodes.forEach(node => {
             map[node.id] = { ...node, children: [] }
         })
 
+        // Second pass: Link children to parents
+        // Key difference for User View: The "Root" of the tree is the current user.
+        // The API returns the current user and their downline.
+        // We find the node that has no parent *in the returned list*.
+        // (The current user might have a parent DB-wise, but in this list, they are top).
+
+        const idsInList = new Set(nodes.map(n => n.id))
+
         nodes.forEach(node => {
             const mappedNode = map[node.id]
-            if (node.referred_by_id && map[node.referred_by_id]) {
+            if (node.referred_by_id && idsInList.has(node.referred_by_id)) {
                 map[node.referred_by_id].children.push(mappedNode)
             } else {
                 roots.push(mappedNode)
@@ -79,9 +106,15 @@ export default function NetworkPage() {
         return roots
     }
 
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(`https://domain.com/register?ref=${myReferralCode}`)
+        // Simple alert or toast replacement
+        alert("Referral link copied!")
+    }
+
     return (
         <div className="min-h-screen bg-background text-foreground flex dark">
-            <Sidebar collapsed={!isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
+            <Sidebar collapsed={!isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} role="user" />
 
             <main className={`flex-1 flex flex-col h-screen bg-muted/10 transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-20'}`}>
 
@@ -89,15 +122,22 @@ export default function NetworkPage() {
                 <header className="h-16 border-b flex items-center justify-between px-6 bg-background sticky top-0 z-50">
                     <div className="flex items-center gap-4">
                         <Share2 className="h-6 w-6 text-primary" />
-                        <h1 className="text-xl font-bold">Network Hierarchy</h1>
+                        <h1 className="text-xl font-bold">My Team Hierarchy</h1>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="relative">
+                        {myReferralCode && (
+                            <Button variant="outline" size="sm" onClick={copyToClipboard} className="mr-2 hidden md:flex items-center gap-2">
+                                <Copy className="h-3 w-3" />
+                                <span>{myReferralCode}</span>
+                            </Button>
+                        )}
+
+                        <div className="relative hidden md:block">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <input
                                 type="text"
-                                placeholder="Search user..."
+                                placeholder="Search in team..."
                                 className="pl-9 pr-4 py-1.5 text-sm bg-muted rounded-md focus:outline-none focus:ring-1 focus:ring-primary w-64 border border-transparent focus:bg-background"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
@@ -140,10 +180,13 @@ export default function NetworkPage() {
                         {loading ? (
                             <div className="flex flex-col items-center justify-center mt-20 gap-4">
                                 <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
-                                <p className="text-muted-foreground">Loading exact hierarchy...</p>
+                                <p className="text-muted-foreground">Loading your team...</p>
                             </div>
                         ) : treeData.length === 0 ? (
-                            <div className="text-center p-12 text-muted-foreground">No network data found.</div>
+                            <div className="text-center p-12 text-muted-foreground">
+                                <p className="text-lg">You haven't referred anyone yet.</p>
+                                <p className="text-sm mt-2">Share your referral code to build your team!</p>
+                            </div>
                         ) : (
                             viewMode === 'chart' ? (
                                 <div className="flex gap-16">
@@ -180,7 +223,7 @@ const ChartNode = ({ node }: { node: TreeNode }) => {
                             <User className="h-4 w-4" />
                         </div>
                         <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                            {node.role === 'super_admin' ? 'ROOT' : `L${node.level}`}
+                            {node.level === 0 ? 'YOU' : `L${node.level}`}
                         </span>
                     </div>
 
@@ -223,17 +266,6 @@ const ChartNode = ({ node }: { node: TreeNode }) => {
 
                         {/* Horizontal Bar Wrapper */}
                         <div className="flex relative">
-                            {/* Horizontal Line connecting first and last child 
-                                We only draw this if there is > 1 child.
-                                Absolute positioning with calculated left/right insets works best, 
-                                but flex gap is varying. 
-                                Easier CSS trick: 
-                                - Each child has a top line.
-                                - The parent has a bottom-spanning bar? No.
-                                - Pseudo-elements on children.
-                            */}
-
-                            {/* Simplified Connector: Flex Row with lines going up */}
                             <div className="flex gap-8 relative items-start pt-8">
                                 {/* The Magic Horizontal Bar */}
                                 {node.children.length > 1 && (
@@ -283,7 +315,9 @@ const ListNode = ({ node, level }: { node: TreeNode, level: number }) => {
                 <div className="flex-1 min-w-[200px]">
                     <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm">{node.username}</span>
-                        <span className="text-[10px] font-mono bg-muted px-1.5 rounded text-muted-foreground">{node.role === 'super_admin' ? 'ROOT' : `L${node.level}`}</span>
+                        <span className="text-[10px] font-mono bg-muted px-1.5 rounded text-muted-foreground">
+                            {level === 0 ? 'YOU' : `L${level}`}
+                        </span>
                     </div>
                     <div className="text-xs text-muted-foreground">{node.email}</div>
                 </div>

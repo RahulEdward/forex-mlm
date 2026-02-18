@@ -20,7 +20,7 @@ export default function DistributionsPage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground flex dark">
-            <Sidebar collapsed={!isSidebarOpen} />
+            <Sidebar collapsed={!isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
 
             <main className={`flex-1 flex flex-col h-screen bg-muted/10 transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-20'}`}>
 
