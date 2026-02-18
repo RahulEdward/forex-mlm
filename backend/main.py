@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from typing import List
 import models, schemas, auth
 from routers import referral
 from utils import generate_referral_code
@@ -129,7 +130,7 @@ def create_admin(
     db.refresh(new_admin)
     return new_admin
 
-@app.get("/api/users")
+@app.get("/api/users", response_model=List[schemas.UserResponse])
 def get_users(
     current_user: models.User = Depends(auth.require_role(["super_admin", "admin"])),
     db: Session = Depends(get_db)

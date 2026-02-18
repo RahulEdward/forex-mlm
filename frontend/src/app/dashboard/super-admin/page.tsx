@@ -5,19 +5,19 @@ import { useRouter } from 'next/navigation'
 import {
   Users,
   Shield,
-  LogOut,
-  Plus,
-  Search,
-  Settings,
-  LayoutDashboard,
-  MoreVertical,
   UserPlus,
   CheckCircle,
   XCircle,
-  TrendingUp
+  TrendingUp,
+  Activity,
+  MoreVertical,
+  Search,
+  PanelLeft,
+  Menu
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import ReferralTree from '@/components/referral/ReferralTree'
+import { Sidebar } from '@/components/layout/Sidebar'
 
 export default function SuperAdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
@@ -29,6 +29,7 @@ export default function SuperAdminDashboard() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   const router = useRouter()
 
@@ -51,9 +52,17 @@ export default function SuperAdminDashboard() {
       if (response.ok) {
         const data = await response.json()
         setUsers(data)
+      } else if (response.status === 401) {
+        // Token expired or invalid
+        localStorage.clear()
+        router.push('/login')
+      } else {
+        console.error('Failed to fetch users:', response.statusText)
+        setError('Failed to load users. Please try logging in again.')
       }
     } catch (err) {
-      console.error('Failed to fetch users')
+      console.error('Failed to fetch users', err)
+      setError('Connection error. Is the backend running?')
     } finally {
       setIsLoading(false)
     }
@@ -98,11 +107,6 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.clear()
-    router.push('/')
-  }
-
   // Filter users based on search
   const filteredUsers = users.filter(user =>
     user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -111,261 +115,273 @@ export default function SuperAdminDashboard() {
 
   // Stats for the cards
   const totalUsers = users.length
-  const totalAdmins = users.filter(u => u.role === 'admin' || u.role === 'super_admin').length
+  const totalAdmins = users.filter(u => u.role === 'admin' && u.role !== 'super_admin').length
   const activeUsers = users.filter(u => u.is_active).length
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Top Navigation Bar with Brown Gradient */}
-      <nav className="h-16 bg-gradient-to-r from-amber-950 via-yellow-900 to-amber-900 shadow-lg flex items-center justify-between px-6 sticky top-0 z-50 text-white">
-        <div className="flex items-center gap-2">
-          <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm">
-            <Shield className="w-5 h-5 text-amber-100" />
+    <div className="min-h-screen bg-background text-foreground flex dark">
+      {/* Sidebar */}
+      <Sidebar collapsed={!isSidebarOpen} />
+
+      {/* Main Content Area */}
+      <main className={`flex-1 overflow-y-auto h-screen bg-muted/20 transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-20'}`}>
+        {/* Header */}
+        <header className="h-16 border-b flex items-center justify-between px-8 bg-background sticky top-0 z-50">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="mr-4 shrink-0 border-muted-foreground/20">
+              <Menu className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
+              Super Admin View
+            </span>
           </div>
-          <span className="font-bold text-xl tracking-wide text-amber-50">AuthShield <span className="text-amber-200/60 font-medium text-sm ml-1">Admin</span></span>
-        </div>
-
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-amber-100/80">
-          <button className="hover:text-white transition-colors flex items-center gap-2">
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
-          </button>
-          <button className="hover:text-white transition-colors flex items-center gap-2 text-white">
-            <Users className="w-4 h-4" /> Users
-          </button>
-          <button className="hover:text-white transition-colors flex items-center gap-2">
-            <Settings className="w-4 h-4" /> Settings
-          </button>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center text-xs text-amber-200/70 mr-2">
-            Super Admin
+          <div className="flex items-center gap-4">
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
+              SA
+            </div>
           </div>
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            size="sm"
-            className="text-amber-100 hover:text-white hover:bg-white/10"
-          >
-            <LogOut className="w-4 h-4 mr-2" /> Logout
-          </Button>
-        </div>
-      </nav>
+        </header>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full space-y-8">
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard
-            title="Total Users"
-            value={totalUsers}
-            icon={Users}
-            gradient="from-amber-800 to-yellow-700"
-          />
-          <StatCard
-            title="Active Admins"
-            value={totalAdmins}
-            icon={Shield}
-            gradient="from-amber-900 to-amber-800"
-          />
-          <StatCard
-            title="System Status"
-            value="Healthy"
-            icon={TrendingUp}
-            gradient="from-stone-800 to-stone-700"
-          />
-        </div>
-
-        {/* Action Bar & Search */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/50"
+        <div className="p-8 space-y-8 max-w-[1600px] mx-auto">
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
+              title="Total Users"
+              value={totalUsers}
+              icon={Users}
+              description="+20.1% from last month"
+            />
+            <StatCard
+              title="Active Admins"
+              value={totalAdmins}
+              icon={Shield}
+              description="Manage system access"
+            />
+            <StatCard
+              title="Active Sessions"
+              value={activeUsers}
+              icon={Activity}
+              description="Currently logged in"
+            />
+            <StatCard
+              title="System Health"
+              value="99.9%"
+              icon={TrendingUp}
+              description="All systems operational"
             />
           </div>
-          <Button
-            onClick={() => setShowCreateAdmin(!showCreateAdmin)}
-            className="w-full md:w-auto bg-gradient-to-r from-amber-700 to-yellow-600 hover:from-amber-800 hover:to-yellow-700 text-white shadow-md hover:shadow-lg transition-all"
-          >
-            {showCreateAdmin ? 'Cancel' : (
-              <>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Create New Admin
-              </>
-            )}
-          </Button>
-        </div>
 
-        {/* Create Admin Form */}
-        {showCreateAdmin && (
-          <div className="bg-card border border-border rounded-xl p-6 shadow-xl animate-in slide-in-from-top-4 duration-300">
-            <h3 className="text-lg font-semibold mb-6 flex items-center gap-2 text-primary">
-              <Shield className="w-5 h-5" />
-              Create New Administrator
-            </h3>
-            <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Username</label>
-                <input
-                  type="text"
-                  value={adminUsername}
-                  onChange={(e) => setAdminUsername(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                  placeholder="admin_user"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Email Address</label>
-                <input
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                  placeholder="admin@example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Password</label>
-                <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-[42px]">
-                Create Account
-              </Button>
-            </form>
-            {message && (
-              <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-lg flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" /> {message}
-              </div>
-            )}
-            {error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg flex items-center gap-2">
-                <XCircle className="w-4 h-4" /> {error}
-              </div>
-            )}
+          {/* Quick Actions & Search */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-card p-4 rounded-xl border border-border">
+            <div className="relative w-full md:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground"
+              />
+            </div>
+            <Button
+              onClick={() => setShowCreateAdmin(!showCreateAdmin)}
+              className="w-full md:w-auto shadow-sm"
+            >
+              {showCreateAdmin ? 'Cancel' : (
+                <>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Create New Admin
+                </>
+              )}
+            </Button>
           </div>
-        )}
 
-        {/* Global Referral Tree */}
-        <div className="bg-card border border-border rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 text-primary flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Global Referral Hierarchy
-          </h3>
-          <ReferralTree endpoint="/api/referral/admin/tree" maxDepth={5} />
-        </div>
+          {/* Create Admin Form */}
+          {showCreateAdmin && (
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                Create New Administrator
+              </h3>
+              <form onSubmit={handleCreateAdmin} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Username</label>
+                  <input
+                    type="text"
+                    value={adminUsername}
+                    onChange={(e) => setAdminUsername(e.target.value)}
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="admin_user"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Email Address</label>
+                  <input
+                    type="email"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="admin@example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Password</label>
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <Button type="submit">Create Account</Button>
+              </form>
+              {message && (
+                <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 text-green-600 rounded-md flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4" /> {message}
+                </div>
+              )}
+              {error && (
+                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md flex items-center gap-2 text-sm">
+                  <XCircle className="w-4 h-4" /> {error}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Users Table */}
-        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-muted/50 border-b border-border">
-                  <th className="p-4 font-semibold text-muted-foreground text-sm w-16">ID</th>
-                  <th className="p-4 font-semibold text-muted-foreground text-sm">User Details</th>
-                  <th className="p-4 font-semibold text-muted-foreground text-sm hidden md:table-cell">Contact</th>
-                  <th className="p-4 font-semibold text-muted-foreground text-sm">Role</th>
-                  <th className="p-4 font-semibold text-muted-foreground text-sm text-center">Status</th>
-                  <th className="p-4 font-semibold text-muted-foreground text-sm w-12"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      No users found matching "{searchTerm}"
-                    </td>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Global Referral Tree - Takes up 2 columns */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold tracking-tight">Referral Network</h3>
+                <Button variant="link" onClick={() => router.push('/dashboard/super-admin/network')}>
+                  View Full Hierarchy
+                </Button>
+              </div>
+              <div className="bg-card border border-border rounded-xl shadow-sm p-6 min-h-[400px]">
+                <ReferralTree endpoint="/api/referral/admin/tree" maxDepth={5} />
+              </div>
+            </div>
+
+            {/* Users Table - Takes up 1 column (Acting as a "Recent Users" list) */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold tracking-tight">Recent Users</h3>
+              <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr className="border-b border-border">
+                        <th className="p-3 font-medium text-muted-foreground">User</th>
+                        <th className="p-3 font-medium text-muted-foreground text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredUsers.slice(0, 10).map((user) => (
+                        <tr key={user.id} className="hover:bg-muted/50 transition-colors">
+                          <td className="p-3">
+                            <div className="font-medium">{user.username}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                          </td>
+                          <td className="p-3 text-right">
+                            <span className={`inline-flex h-2 w-2 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-red-500'}`} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Users Table Block if needed below */}
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold tracking-tight">All Users</h3>
+            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/50">
+                  <tr className="border-b border-border">
+                    <th className="p-4 font-medium text-muted-foreground">ID</th>
+                    <th className="p-4 font-medium text-muted-foreground">User</th>
+                    <th className="p-4 font-medium text-muted-foreground">Role</th>
+                    <th className="p-4 font-medium text-muted-foreground">Referral Info</th>
+                    <th className="p-4 font-medium text-muted-foreground">Status</th>
+                    <th className="p-4 font-medium text-muted-foreground text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-muted/30 transition-colors group">
-                      <td className="p-4 text-muted-foreground text-sm font-mono">{user.id}</td>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="p-4 font-mono text-muted-foreground">{user.id}</td>
                       <td className="p-4">
-                        <div className="font-medium text-foreground">{user.username}</div>
-                        <div className="text-xs text-muted-foreground md:hidden">{user.email}</div>
+                        <div className="font-medium">{user.username}</div>
+                        <div className="text-xs text-muted-foreground">{user.email}</div>
                       </td>
-                      <td className="p-4 text-sm text-muted-foreground hidden md:table-cell">{user.email}</td>
+                      <td className="p-4"><Badge role={user.role} /></td>
                       <td className="p-4">
-                        <Badge role={user.role} />
+                        <div className="flex flex-col gap-1 text-sm">
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">Code:</span>
+                            <span className="font-mono bg-muted/50 px-1 rounded">{user.referral_code || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span>Ref By:</span>
+                            <span>{user.referred_by_id ? `#${user.referred_by_id}` : 'Root'}</span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${user.is_active
-                          ? 'bg-green-500/15 text-green-700 dark:text-green-400'
-                          : 'bg-red-500/15 text-red-700 dark:text-red-400'
+                      <td className="p-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-500/10 text-green-500' : 'bg-destructive/10 text-destructive'
                           }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-red-500'}`}></span>
                           {user.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {filteredUsers.length > 0 && (
-            <div className="p-4 border-t border-border bg-muted/20 text-xs text-muted-foreground flex justify-between items-center">
-              <span>Showing {filteredUsers.length} users</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled className="h-7 text-xs">Previous</Button>
-                <Button variant="outline" size="sm" disabled className="h-7 text-xs">Next</Button>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </div>
       </main>
     </div>
   )
 }
 
-// Helper Components
-
-function StatCard({ title, value, icon: Icon, gradient }: { title: string, value: string | number, icon: any, gradient: string }) {
+function StatCard({ title, value, icon: Icon, description, className }: { title: string, value: string | number, icon: any, description?: string, className?: string }) {
   return (
-    <div className={`p-6 rounded-xl text-white shadow-lg bg-gradient-to-br ${gradient} relative overflow-hidden group`}>
-      <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
-        <Icon className="w-24 h-24" />
+    <div className={`p-6 rounded-xl bg-card border border-border shadow-sm ${className}`}>
+      <div className="flex items-center justify-between space-y-0 pb-2">
+        <h3 className="tracking-tight text-sm font-medium text-muted-foreground">{title}</h3>
+        <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
-      <div className="relative z-10">
-        <div className="flex items-center gap-2 opacity-80 mb-2">
-          <Icon className="w-4 h-4" />
-          <span className="text-sm font-medium uppercase tracking-wider">{title}</span>
-        </div>
-        <div className="text-3xl font-bold">{value}</div>
+      <div>
+        <div className="text-2xl font-bold">{value}</div>
+        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
       </div>
     </div>
   )
 }
 
 function Badge({ role }: { role: string }) {
-  const styles = {
-    super_admin: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20',
-    admin: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20',
-    user: 'bg-stone-100 text-stone-700 border-stone-200 dark:bg-stone-500/10 dark:text-stone-300 dark:border-stone-500/20'
-  }[role] || 'bg-gray-100 text-gray-700'
+  const colors: any = {
+    super_admin: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+    admin: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    user: "border-transparent bg-muted text-muted-foreground hover:bg-muted/80"
+  }
 
   return (
-    <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${styles} capitalize inline-block min-w-[80px] text-center`}>
+    <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${colors[role] || colors.user} capitalize`}>
       {role.replace('_', ' ')}
-    </span>
+    </div>
   )
 }

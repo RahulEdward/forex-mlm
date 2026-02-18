@@ -1,23 +1,51 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
+import { ChevronRight, ChevronDown, User, Network } from 'lucide-react'
 
-export default function ReferralTree({ maxDepth = 3, endpoint = '/api/referral/tree' }: { maxDepth?: number, endpoint?: string }) {
-    const [tree, setTree] = useState<any[]>([])
+interface TreeNode {
+    id: number
+    username: string
+    email: string
+    role: string
+    is_active: boolean
+    level: number
+    referred_by_id: number | null
+    children: TreeNode[]
+}
+
+export default function ReferralTree({ maxDepth = 20, endpoint = '/api/referral/tree' }: { maxDepth?: number, endpoint?: string }) {
+    const [treeData, setTreeData] = useState<TreeNode[]>([])
     const [loading, setLoading] = useState(true)
+    const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set())
 
     useEffect(() => {
         const fetchTree = async () => {
+            setLoading(true)
             try {
-                const token = localStorage.getItem('access_token')
-                const url = new URL(`http://localhost:8000${endpoint}`)
+                // Determine token based on role stored (Super Admin vs User)
+                // Actually the token is just 'token' or 'access_token' in localStorage
+                // The previous code used 'access_token', but login uses 'token'. Let's check both or fix to 'token'.
+                const token = localStorage.getItem('token') || localStorage.getItem('access_token')
+
+                // Construct URL correctly
+                const baseUrl = endpoint.startsWith('http') ? endpoint : `http://localhost:8000${endpoint}`
+                const url = new URL(baseUrl)
                 url.searchParams.append('depth', maxDepth.toString())
 
                 const res = await fetch(url.toString(), {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 })
+
                 if (res.ok) {
-                    const data = await res.json()
-                    setTree(data)
+                    const flatList = await res.json()
+                    const hierarchy = buildHierarchy(flatList)
+                    setTreeData(hierarchy)
+                    // Auto-expand top level
+                    if (hierarchy.length > 0) {
+                        setExpandedNodes(new Set([hierarchy[0].id]))
+                    }
+                } else {
+                    console.error("Tree fetch failed:", res.status)
                 }
             } catch (err) {
                 console.error("Failed to fetch tree", err)
@@ -26,71 +54,119 @@ export default function ReferralTree({ maxDepth = 3, endpoint = '/api/referral/t
             }
         }
         fetchTree()
-    }, [maxDepth])
+    }, [endpoint, maxDepth])
 
-    if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading tree...</div>
+    const buildHierarchy = (nodes: any[]): TreeNode[] => {
+        const map: { [key: number]: TreeNode } = {}
+        const roots: TreeNode[] = []
 
-    // Create a hierarchical view from the flat list
-    const buildHierarchy = (nodes: any[]) => {
-        const map: any = {}
-        const roots: any[] = []
-
-        // Initialize map
+        // 1. Initialize all nodes
         nodes.forEach(node => {
             map[node.id] = { ...node, children: [] }
         })
 
-        // Build parent-child relationships
+        // 2. Link parents and children
         nodes.forEach(node => {
-            if (node.level === 1) { // In relative view, level 1 is direct child of logged-in user
-                if (map[node.id]) roots.push(map[node.id])
+            const mappedNode = map[node.id]
+            if (node.referred_by_id && map[node.referred_by_id]) {
+                map[node.referred_by_id].children.push(mappedNode)
             } else {
-                const parent = map[node.referred_by_id]
-                if (parent) {
-                    parent.children.push(map[node.id])
-                }
+                // If no referred_by_id, OR referrer is not in the fetched set (e.g. we fetched a subtree), it's a root
+                roots.push(mappedNode)
             }
         })
 
         return roots
     }
 
-    const hierarchy = buildHierarchy(tree)
+    const toggleExpand = (id: number) => {
+        const newSet = new Set(expandedNodes)
+        if (newSet.has(id)) {
+            newSet.delete(id)
+        } else {
+            newSet.add(id)
+        }
+        setExpandedNodes(newSet)
+    }
 
-    const NodeView = ({ node, level = 0 }: { node: any, level?: number }) => (
-        <div style={{ marginLeft: level > 0 ? '1.5rem' : '0', borderLeft: level > 0 ? '1px solid #e2e8f0' : 'none', paddingLeft: level > 0 ? '1rem' : '0', paddingBottom: '0.5rem' }}>
-            <div style={{ padding: '0.5rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ fontWeight: 'bold', color: '#334155' }}>{node.username}</div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>({node.email})</div>
-                <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: node.is_active ? '#dcfce7' : '#fee2e2', color: node.is_active ? '#166534' : '#991b1b' }}>
-                    {node.is_active ? 'Active' : 'Inactive'}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>L{node.level}</span>
-            </div>
-            {node.children && node.children.length > 0 && (
-                <div style={{ marginTop: '0.5rem' }}>
-                    {node.children.map((child: any) => (
-                        <NodeView key={child.id} node={child} level={level + 1} />
-                    ))}
+    const TreeNodeView = ({ node, level }: { node: TreeNode, level: number }) => {
+        const hasChildren = node.children && node.children.length > 0
+        const isExpanded = expandedNodes.has(node.id)
+
+        return (
+            <div className="select-none">
+                <div
+                    className={`flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors ${level === 0 ? 'bg-muted/20 mb-1' : ''}`}
+                    style={{ marginLeft: `${level * 20}px` }}
+                    onClick={() => toggleExpand(node.id)}
+                >
+                    <div className={`text-muted-foreground w-4 flex justify-center`}>
+                        {hasChildren ? (
+                            isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                        ) : (
+                            <div className="w-4" />
+                        )}
+                    </div>
+
+                    <div className={`flex items-center gap-2 ${node.is_active ? 'text-foreground' : 'text-muted-foreground opacity-70'}`}>
+                        <div className={`p-1 rounded-full ${node.is_active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                            <User className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="font-medium text-sm">{node.username}</span>
+                        <span className="text-xs text-muted-foreground hidden sm:inline-block font-mono bg-muted px-1 rounded">
+                            {node.role === 'super_admin' ? 'SA' : `L${node.level}`}
+                        </span>
+                        {!node.is_active && <span className="text-[10px] uppercase text-red-500 font-bold ml-1">Inactive</span>}
+                    </div>
+
+                    {hasChildren && (
+                        <div className="ml-auto text-xs text-muted-foreground bg-muted/50 px-1.5 rounded-full">
+                            {node.children.length}
+                        </div>
+                    )}
                 </div>
-            )}
-        </div>
-    )
+
+                {isExpanded && hasChildren && (
+                    <div className="relative">
+                        {/* Optional vertical guide line */}
+                        <div
+                            className="absolute left-0 top-0 bottom-0 border-l border-border/50"
+                            style={{ left: `${(level * 20) + 11}px` }}
+                        />
+                        {node.children.map(child => (
+                            <TreeNodeView key={child.id} node={child} level={level + 1} />
+                        ))}
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                <p className="text-sm">Loading network...</p>
+            </div>
+        )
+    }
+
+    if (treeData.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                <Network className="h-10 w-10 mb-2 opacity-20" />
+                <p>No referral network found.</p>
+            </div>
+        )
+    }
 
     return (
-        <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 1rem', color: '#333' }}>Referral Hierarchy</h3>
-            {loading ? (
-                <div>Loading...</div>
-            ) : hierarchy.length === 0 ? (
-                <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>No referrals found.</div>
-            ) : (
-                <div>
-                    {hierarchy.map((root: any) => (
-                        <NodeView key={root.id} node={root} />
-                    ))}
-                </div>
-            )}
+        <div className="w-full overflow-x-auto pb-4">
+            <div className="min-w-[300px]">
+                {treeData.map(root => (
+                    <TreeNodeView key={root.id} node={root} level={0} />
+                ))}
+            </div>
         </div>
     )
 }
