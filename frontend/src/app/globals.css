@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Mode - Warm Cream/Brown Theme */
+    --background: 35 30% 98%;
+    --foreground: 20 14% 4%;
+    
+    --card: 35 30% 98%;
+    --card-foreground: 20 14% 4%;
+    
+    --popover: 35 30% 98%;
+    --popover-foreground: 20 14% 4%;
+    
+    --primary: 28 65% 45%;   /* Rich Brown */
+    --primary-foreground: 35 30% 98%;
+    
+    --secondary: 30 20% 92%;
+    --secondary-foreground: 28 65% 25%;
+    
+    --muted: 30 20% 92%;
+    --muted-foreground: 25 10% 45%;
+    
+    --accent: 30 20% 92%;
+    --accent-foreground: 28 65% 25%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --border: 30 15% 85%;
+    --input: 30 15% 85%;
+    --ring: 28 65% 45%;
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark Mode - Deep Espresso/Coffee Theme */
+    --background: 25 35% 8%;
+    --foreground: 35 20% 96%;
+    
+    --card: 25 30% 12%;
+    --card-foreground: 35 20% 96%;
+    
+    --popover: 25 30% 12%;
+    --popover-foreground: 35 20% 96%;
+    
+    --primary: 32 80% 60%;  /* Lighter Bronze/Caramel for contrast on dark */
+    --primary-foreground: 25 35% 8%;
+    
+    --secondary: 25 25% 18%;
+    --secondary-foreground: 35 20% 96%;
+    
+    --muted: 25 25% 18%;
+    --muted-foreground: 30 15% 65%;
+    
+    --accent: 25 25% 18%;
+    --accent-foreground: 35 20% 96%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 35 20% 96%;
+    
+    --border: 25 25% 18%;
+    --input: 25 25% 18%;
+    --ring: 32 80% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
